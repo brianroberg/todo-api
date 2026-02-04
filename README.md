@@ -18,8 +18,8 @@ This API implements the core GTD workflow:
 
 ### Prerequisites
 
-- Python 3.11+
-- pip or uv
+- Python 3.14+
+- [uv](https://docs.astral.sh/uv/)
 
 ### Installation
 
@@ -29,9 +29,6 @@ git clone <repo-url>
 cd todo-api
 
 # Install dependencies
-pip install -e .
-
-# Or with uv
 uv pip install -e .
 ```
 
