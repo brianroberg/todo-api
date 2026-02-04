@@ -187,11 +187,16 @@ fly launch --no-deploy
 fly volumes create gtd_data --size 1 --region ord
 
 # Set the admin key for API key creation (optional but recommended)
-fly secrets set ADMIN_KEY=$(openssl rand -hex 32)
+# Generate the key and save it somewhere secure - you'll need it to create API keys
+ADMIN_KEY=$(openssl rand -hex 32)
+echo "Save this admin key: $ADMIN_KEY"
+fly secrets set ADMIN_KEY=$ADMIN_KEY
 
 # Deploy
 fly deploy
 ```
+
+> **Note on volume redundancy:** This setup uses a single volume, which means potential downtime if the host machine fails. Fly.io recommends at least two volumes for production apps. For a personal GTD API, this tradeoff is reasonable—Fly.io takes daily snapshots (retained 5 days) for disaster recovery. A future improvement could be adding [LiteFS](https://fly.io/docs/litefs/) for distributed SQLite replication across multiple nodes.
 
 ### Post-deployment
 
