@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -61,7 +61,7 @@ def get_upcoming_deadlines(
     api_key: ApiKey = Depends(get_current_api_key),
 ):
     """Actions and projects with deadlines in the next N days."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     cutoff = now + timedelta(days=days)
 
     deadlines = []
@@ -171,7 +171,7 @@ def get_overdue_items(
     api_key: ApiKey = Depends(get_current_api_key),
 ):
     """Get all items that are past their due date."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     items = (
         db.query(Item)

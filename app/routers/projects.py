@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -149,7 +149,7 @@ def update_project(
     if project_data.status is not None:
         project.status = project_data.status.value
         if project_data.status == ProjectStatus.COMPLETED:
-            project.completed_at = datetime.utcnow()
+            project.completed_at = datetime.now(timezone.utc)
         else:
             project.completed_at = None
 
@@ -255,7 +255,7 @@ def complete_project(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
     project.status = "completed"
-    project.completed_at = datetime.utcnow()
+    project.completed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(project)
 

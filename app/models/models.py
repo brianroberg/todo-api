@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -15,6 +15,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+
+
+def utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 # Junction table for Item <-> Tag many-to-many relationship
@@ -35,7 +40,7 @@ class ApiKey(Base):
     key_hash = Column(String(255), unique=True, nullable=False, index=True)
     name = Column(String(255))  # Optional friendly name for the key
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     # Relationships
     areas = relationship("Area", back_populates="api_key", cascade="all, delete-orphan")
@@ -54,8 +59,8 @@ class Area(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text)
     sort_order = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     # Relationships
     api_key = relationship("ApiKey", back_populates="areas")
@@ -83,8 +88,8 @@ class Project(Base):
     due_date = Column(DateTime)
     due_date_is_hard = Column(Boolean, default=False, nullable=False)
     completed_at = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     # Relationships
     api_key = relationship("ApiKey", back_populates="projects")
@@ -107,8 +112,8 @@ class Tag(Base):
     api_key_id = Column(Integer, ForeignKey("api_keys.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(100), nullable=False)
     color = Column(String(7))  # Hex color like "#ff5733"
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     # Relationships
     api_key = relationship("ApiKey", back_populates="tags")
@@ -157,8 +162,8 @@ class Item(Base):
     sort_order = Column(Integer, default=0, nullable=False)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
     completed_at = Column(DateTime)
     deleted_at = Column(DateTime)
 

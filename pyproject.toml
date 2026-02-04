@@ -28,6 +28,12 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
 
+[tool.pytest.ini_options]
+filterwarnings = [
+    # SQLAlchemy uses datetime.utcnow() internally - ignore until they fix it
+    "ignore:datetime.datetime.utcnow:DeprecationWarning:sqlalchemy",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py314"

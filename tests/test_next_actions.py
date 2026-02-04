@@ -1,6 +1,6 @@
 """Tests for next actions endpoint - managing actionable tasks."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -144,7 +144,7 @@ class TestNextActionsFiltering:
     def test_filter_excludes_future_tickler_items(self, client: TestClient):
         """GET /next-actions must exclude items with future tickler_date."""
         # Create item with future tickler date
-        future_date = (datetime.utcnow() + timedelta(days=30)).isoformat()
+        future_date = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
         client.post("/next-actions", json={
             "title": "Future tickler",
             "tickler_date": future_date
@@ -161,7 +161,7 @@ class TestNextActionsFiltering:
     def test_filter_includes_past_tickler_items(self, client: TestClient):
         """GET /next-actions must include items with past tickler_date."""
         # Create item with past tickler date
-        past_date = (datetime.utcnow() - timedelta(days=1)).isoformat()
+        past_date = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
         client.post("/next-actions", json={
             "title": "Past tickler",
             "tickler_date": past_date

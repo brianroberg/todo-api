@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -35,7 +35,7 @@ def list_tickler(
     api_key: ApiKey = Depends(get_current_api_key),
 ):
     """List all tickler items (items with future tickler dates)."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     query = db.query(Item).filter(
         Item.api_key_id == api_key.id,
@@ -61,7 +61,7 @@ def create_tickler(
     api_key: ApiKey = Depends(get_current_api_key),
 ):
     """Create a tickler item."""
-    if tickler_data.tickler_date <= datetime.utcnow():
+    if tickler_data.tickler_date <= datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Tickler date must be in the future",
@@ -96,7 +96,7 @@ def get_tickler_today(
     api_key: ApiKey = Depends(get_current_api_key),
 ):
     """Get items whose tickler date is today (items that should be processed now)."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
 
@@ -165,7 +165,7 @@ def update_tickler_item(
         item.notes = item_data.notes
 
     if item_data.tickler_date is not None:
-        if item_data.tickler_date <= datetime.utcnow():
+        if item_data.tickler_date <= datetime.now(timezone.utc):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Tickler date must be in the future",

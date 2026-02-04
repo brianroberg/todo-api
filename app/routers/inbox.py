@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -182,7 +182,7 @@ def process_inbox_item(
 
     elif process_data.destination == ProcessDestination.DELETE:
         item.status = "deleted"
-        item.deleted_at = datetime.utcnow()
+        item.deleted_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(item)

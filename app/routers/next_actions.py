@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -24,7 +24,7 @@ def list_next_actions(
     api_key: ApiKey = Depends(get_current_api_key),
 ):
     """List all next actions with optional filters."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     query = db.query(Item).filter(
         Item.api_key_id == api_key.id,
@@ -104,7 +104,7 @@ def create_next_action(
         due_date=item_data.due_date,
         due_date_is_hard=item_data.due_date_is_hard,
         delegated_to=item_data.delegated_to,
-        delegated_at=datetime.utcnow() if item_data.delegated_to else None,
+        delegated_at=datetime.now(timezone.utc) if item_data.delegated_to else None,
         energy_level=item_data.energy_level.value if item_data.energy_level else None,
         time_estimate=item_data.time_estimate,
         priority=item_data.priority,
@@ -187,7 +187,7 @@ def update_next_action(
         # Normalize empty string to None
         delegated_to = item_data.delegated_to or None
         if delegated_to and not item.delegated_to:
-            item.delegated_at = datetime.utcnow()
+            item.delegated_at = datetime.now(timezone.utc)
         elif not delegated_to:
             item.delegated_at = None
         item.delegated_to = delegated_to
@@ -251,7 +251,7 @@ def complete_next_action(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Next action not found")
 
     item.status = "completed"
-    item.completed_at = datetime.utcnow()
+    item.completed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(item)
 
