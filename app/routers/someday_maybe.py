@@ -8,6 +8,7 @@ from app.auth import get_current_api_key
 from app.database import get_db
 from app.models import ApiKey, Area, Item, Project, Tag
 from app.schemas import ItemCreate, ItemResponse, ItemUpdate
+from app.sse import notify_change
 
 router = APIRouter(prefix="/someday-maybe", tags=["Someday/Maybe"])
 
@@ -76,6 +77,7 @@ def create_someday_maybe(
 
     db.add(item)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -137,6 +139,7 @@ def update_someday_maybe(
         item.tags = tags
 
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -159,6 +162,7 @@ def delete_someday_maybe(
 
     db.delete(item)
     db.commit()
+    notify_change(api_key.id)
 
 
 @router.post("/{item_id}/complete", response_model=ItemResponse)
@@ -180,6 +184,7 @@ def complete_someday_maybe(
     item.status = "completed"
     item.completed_at = datetime.now(timezone.utc)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -227,6 +232,7 @@ def activate_someday_maybe(
 
     item.status = "next_action"
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item

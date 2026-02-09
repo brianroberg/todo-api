@@ -8,6 +8,7 @@ from app.auth import get_current_api_key
 from app.database import get_db
 from app.models import ApiKey, Item, Tag
 from app.schemas import ItemResponse, ItemUpdate
+from app.sse import notify_change
 
 router = APIRouter(prefix="/tickler", tags=["Tickler"])
 
@@ -92,6 +93,7 @@ def create_tickler(
 
     db.add(item)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -186,6 +188,7 @@ def update_tickler_item(
         item.tags = tags
 
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -213,6 +216,7 @@ def delete_tickler_item(
 
     db.delete(item)
     db.commit()
+    notify_change(api_key.id)
 
 
 @router.post("/{item_id}/complete", response_model=ItemResponse)
@@ -239,6 +243,7 @@ def complete_tickler_item(
     item.status = "completed"
     item.completed_at = datetime.now(timezone.utc)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -281,6 +286,7 @@ def surface_tickler_item(
         )
 
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item

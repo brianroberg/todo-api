@@ -7,6 +7,7 @@ from app.auth import get_current_api_key
 from app.database import get_db
 from app.models import ApiKey, Area, Item, Project, Tag
 from app.schemas import ItemCreate, ItemResponse, ItemUpdate
+from app.sse import notify_change
 
 router = APIRouter(prefix="/next-actions", tags=["Next Actions"])
 
@@ -121,6 +122,7 @@ def create_next_action(
 
     db.add(item)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -219,6 +221,7 @@ def update_next_action(
         item.tags = tags
 
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -241,6 +244,7 @@ def delete_next_action(
 
     db.delete(item)
     db.commit()
+    notify_change(api_key.id)
 
 
 @router.post("/{item_id}/complete", response_model=ItemResponse)
@@ -262,6 +266,7 @@ def complete_next_action(
     item.status = "completed"
     item.completed_at = datetime.now(timezone.utc)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -284,6 +289,7 @@ def defer_next_action(
 
     item.status = "someday_maybe"
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item

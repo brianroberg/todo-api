@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import ApiKey, Area, Item, Project, Tag
 from app.schemas import ItemCreate, ItemResponse, ProjectCreate, ProjectUpdate
 from app.schemas.schemas import ProjectStatus, ProjectWithStats
+from app.sse import notify_change
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -100,6 +101,7 @@ def create_project(
     )
     db.add(project)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(project)
 
     return get_project_with_stats(db, project)
@@ -160,6 +162,7 @@ def update_project(
         project.due_date_is_hard = project_data.due_date_is_hard
 
     db.commit()
+    notify_change(api_key.id)
     db.refresh(project)
 
     return get_project_with_stats(db, project)
@@ -178,6 +181,7 @@ def delete_project(
 
     db.delete(project)
     db.commit()
+    notify_change(api_key.id)
 
 
 @router.get("/{project_id}/actions", response_model=list[ItemResponse])
@@ -238,6 +242,7 @@ def create_project_action(
 
     db.add(item)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -257,6 +262,7 @@ def complete_project(
     project.status = "completed"
     project.completed_at = datetime.now(timezone.utc)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(project)
 
     return get_project_with_stats(db, project)
@@ -275,6 +281,7 @@ def hold_project(
 
     project.status = "on_hold"
     db.commit()
+    notify_change(api_key.id)
     db.refresh(project)
 
     return get_project_with_stats(db, project)
@@ -294,6 +301,7 @@ def activate_project(
     project.status = "active"
     project.completed_at = None
     db.commit()
+    notify_change(api_key.id)
     db.refresh(project)
 
     return get_project_with_stats(db, project)

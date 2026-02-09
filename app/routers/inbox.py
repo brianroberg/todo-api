@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import ApiKey, Item, Project, Tag
 from app.schemas import ItemCreate, ItemProcess, ItemResponse, ItemUpdate
 from app.schemas.schemas import ProcessDestination
+from app.sse import notify_change
 
 router = APIRouter(prefix="/inbox", tags=["Inbox"])
 
@@ -59,6 +60,7 @@ def create_inbox_item(
 
     db.add(item)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -111,6 +113,7 @@ def update_inbox_item(
         item.tags = tags
 
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -133,6 +136,7 @@ def delete_inbox_item(
 
     db.delete(item)
     db.commit()
+    notify_change(api_key.id)
 
 
 @router.post("/{item_id}/complete", response_model=ItemResponse)
@@ -154,6 +158,7 @@ def complete_inbox_item(
     item.status = "completed"
     item.completed_at = datetime.now(timezone.utc)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item
@@ -217,6 +222,7 @@ def process_inbox_item(
         item.deleted_at = datetime.now(timezone.utc)
 
     db.commit()
+    notify_change(api_key.id)
     db.refresh(item)
 
     return item

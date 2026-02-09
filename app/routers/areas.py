@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import ApiKey, Area, Item, Project
 from app.schemas import AreaCreate, AreaUpdate, ItemResponse, ProjectResponse
 from app.schemas.schemas import AreaWithStats
+from app.sse import notify_change
 
 router = APIRouter(prefix="/areas", tags=["Areas of Responsibility"])
 
@@ -68,6 +69,7 @@ def create_area(
     )
     db.add(area)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(area)
 
     return AreaWithStats(
@@ -149,6 +151,7 @@ def update_area(
         area.sort_order = area_data.sort_order
 
     db.commit()
+    notify_change(api_key.id)
     db.refresh(area)
 
     project_count = (
@@ -187,6 +190,7 @@ def delete_area(
 
     db.delete(area)
     db.commit()
+    notify_change(api_key.id)
 
 
 @router.get("/{area_id}/projects", response_model=list[ProjectResponse])

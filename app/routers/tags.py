@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import ApiKey, Item, Tag
 from app.schemas import ItemResponse, TagCreate, TagUpdate
 from app.schemas.schemas import TagWithCount
+from app.sse import notify_change
 
 router = APIRouter(prefix="/tags", tags=["Tags"])
 
@@ -56,6 +57,7 @@ def create_tag(
     )
     db.add(tag)
     db.commit()
+    notify_change(api_key.id)
     db.refresh(tag)
 
     return TagWithCount(
@@ -120,6 +122,7 @@ def update_tag(
         tag.color = tag_data.color
 
     db.commit()
+    notify_change(api_key.id)
     db.refresh(tag)
 
     item_count = len([item for item in tag.items if item.status not in ("completed", "deleted")])
@@ -146,6 +149,7 @@ def delete_tag(
 
     db.delete(tag)
     db.commit()
+    notify_change(api_key.id)
 
 
 @router.get("/{tag_id}/items", response_model=list[ItemResponse])

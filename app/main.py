@@ -15,6 +15,7 @@ from app.routers import (
     tags_router,
     tickler_router,
 )
+from app.sse import router as sse_router
 
 settings = get_settings()
 
@@ -48,6 +49,7 @@ app.include_router(tickler_router)
 app.include_router(areas_router)
 app.include_router(tags_router)
 app.include_router(review_router)
+app.include_router(sse_router)
 app.include_router(dashboard_router)
 
 

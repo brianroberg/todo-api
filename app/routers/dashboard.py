@@ -467,6 +467,7 @@ var api = {
     if (resp.status === 401 || resp.status === 403) {
       this.key = null;
       lsDel("gtd_api_key");
+      disconnectSSE();
       showModal();
       throw new Error("auth");
     }
@@ -536,6 +537,7 @@ async function tryConnect() {
     await api.validateKey();
     lsSet("gtd_api_key", k);
     hideModal();
+    connectSSE();
     route();
   } catch (e) {
     if (e.message !== "auth") {
@@ -549,6 +551,7 @@ async function tryConnect() {
 }
 
 document.getElementById("btn-logout").addEventListener("click", function() {
+  disconnectSSE();
   api.key = null;
   lsDel("gtd_api_key");
   cache = {};
@@ -559,6 +562,27 @@ document.getElementById("btn-refresh").addEventListener("click", function() {
   cache = {};
   route();
 });
+
+// ── SSE ─────────────────────────────────────────────────────────
+var sse = null;
+
+function connectSSE() {
+  disconnectSSE();
+  if (!api.key) return;
+  sse = new EventSource("/events?key=" + encodeURIComponent(api.key));
+  sse.addEventListener("change", function() {
+    cache = {};
+    route();
+  });
+  sse.onerror = function() {
+    disconnectSSE();
+    if (api.key) setTimeout(connectSSE, 5000);
+  };
+}
+
+function disconnectSSE() {
+  if (sse) { sse.close(); sse = null; }
+}
 
 // ── Cache ──────────────────────────────────────────────────────
 var cache = {};
@@ -977,6 +1001,7 @@ window.addEventListener("hashchange", route);
     api.key = saved;
     api.validateKey().then(function() {
       hideModal();
+      connectSSE();
       route();
     }).catch(function() {
       showModal();
