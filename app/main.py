@@ -6,6 +6,7 @@ from app.config import get_settings
 from app.database import Base, engine
 from app.routers import (
     areas_router,
+    dashboard_router,
     inbox_router,
     next_actions_router,
     projects_router,
@@ -47,6 +48,7 @@ app.include_router(tickler_router)
 app.include_router(areas_router)
 app.include_router(tags_router)
 app.include_router(review_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/", tags=["Health"])
