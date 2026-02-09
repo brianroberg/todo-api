@@ -296,3 +296,59 @@ class TestNextActionsProjectIntegration:
         items = response.json()
         assert len(items) == 1
         assert items[0]["title"] == "Project task"
+
+
+class TestNextActionsCompletion:
+    """Tests for next action completion and include_completed filtering."""
+
+    def test_complete_sets_completed_from(self, client: TestClient):
+        """POST /next-actions/{id}/complete must set completed_from to next_action."""
+        create_response = client.post("/next-actions", json={"title": "Task"})
+        item_id = create_response.json()["id"]
+
+        response = client.post(f"/next-actions/{item_id}/complete")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["completed_from"] == "next_action"
+
+    def test_completed_items_excluded_from_list_by_default(self, client: TestClient):
+        """GET /next-actions must not return completed items by default."""
+        create_response = client.post("/next-actions", json={"title": "To complete"})
+        item_id = create_response.json()["id"]
+
+        client.post(f"/next-actions/{item_id}/complete")
+
+        response = client.get("/next-actions")
+        assert response.status_code == 200
+        assert len(response.json()) == 0
+
+    def test_include_completed_shows_completed_next_actions(self, client: TestClient):
+        """GET /next-actions?include_completed=true must return completed next actions."""
+        create_response = client.post("/next-actions", json={"title": "Active task"})
+        complete_response = client.post("/next-actions", json={"title": "Completed task"})
+        item_id = complete_response.json()["id"]
+        client.post(f"/next-actions/{item_id}/complete")
+
+        response = client.get("/next-actions?include_completed=true")
+        assert response.status_code == 200
+        items = response.json()
+        assert len(items) == 2
+        titles = {item["title"] for item in items}
+        assert "Active task" in titles
+        assert "Completed task" in titles
+
+    def test_include_completed_does_not_show_other_completed_items(self, client: TestClient):
+        """GET /next-actions?include_completed=true must not return items completed from other statuses."""
+        # Create and complete a someday/maybe item
+        sm_response = client.post("/someday-maybe", json={"title": "Completed someday"})
+        sm_id = sm_response.json()["id"]
+        client.post(f"/someday-maybe/{sm_id}/complete")
+
+        # Create a next action
+        client.post("/next-actions", json={"title": "Active task"})
+
+        response = client.get("/next-actions?include_completed=true")
+        assert response.status_code == 200
+        items = response.json()
+        assert len(items) == 1
+        assert items[0]["title"] == "Active task"

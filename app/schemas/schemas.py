@@ -200,6 +200,7 @@ class ItemResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
+    completed_from: str | None = None
     tags: list[TagResponse] = []
 
     model_config = {"from_attributes": True}

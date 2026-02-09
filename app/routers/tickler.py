@@ -31,6 +31,7 @@ class SurfaceRequest(BaseModel):
 def list_tickler(
     from_date: datetime | None = None,
     to_date: datetime | None = None,
+    include_completed: bool = False,
     db: Session = Depends(get_db),
     api_key: ApiKey = Depends(get_current_api_key),
 ):
@@ -40,9 +41,15 @@ def list_tickler(
     query = db.query(Item).filter(
         Item.api_key_id == api_key.id,
         Item.tickler_date.isnot(None),
-        Item.tickler_date > now,
-        Item.status.notin_(["completed", "deleted"]),
     )
+
+    if include_completed:
+        query = query.filter(Item.status.notin_(["deleted"]))
+    else:
+        query = query.filter(
+            Item.tickler_date > now,
+            Item.status.notin_(["completed", "deleted"]),
+        )
 
     if from_date:
         query = query.filter(Item.tickler_date >= from_date)
@@ -206,6 +213,35 @@ def delete_tickler_item(
 
     db.delete(item)
     db.commit()
+
+
+@router.post("/{item_id}/complete", response_model=ItemResponse)
+def complete_tickler_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(get_current_api_key),
+):
+    """Mark a tickler item as complete."""
+    item = (
+        db.query(Item)
+        .filter(
+            Item.id == item_id,
+            Item.api_key_id == api_key.id,
+            Item.tickler_date.isnot(None),
+            Item.status.notin_(["completed", "deleted"]),
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tickler item not found")
+
+    item.completed_from = item.status
+    item.status = "completed"
+    item.completed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(item)
+
+    return item
 
 
 @router.post("/{item_id}/surface", response_model=ItemResponse)

@@ -165,6 +165,7 @@ class Item(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
     completed_at = Column(DateTime)
+    completed_from = Column(String(50))  # Status before completion (e.g. "next_action", "inbox")
     deleted_at = Column(DateTime)
 
     # Relationships
@@ -180,4 +181,5 @@ class Item(Base):
         Index("ix_items_area_id", "area_id"),
         Index("ix_items_tickler_date", "tickler_date"),
         Index("ix_items_due_date", "due_date"),
+        Index("ix_items_completed_from", "completed_from"),
     )

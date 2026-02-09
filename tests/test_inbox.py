@@ -235,3 +235,67 @@ class TestInboxTagHandling:
         tags = response.json()["tags"]
         assert len(tags) == 1
         assert tags[0]["name"] == "context"
+
+
+class TestInboxCompletion:
+    """Tests for completing inbox items."""
+
+    def test_complete_inbox_item_sets_completed_status(self, client: TestClient):
+        """POST /inbox/{id}/complete must set status to completed."""
+        create_response = client.post("/inbox", json={"title": "Quick task"})
+        item_id = create_response.json()["id"]
+
+        response = client.post(f"/inbox/{item_id}/complete")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "completed"
+        assert data["completed_at"] is not None
+        assert data["completed_from"] == "inbox"
+
+    def test_complete_nonexistent_inbox_item_returns_404(self, client: TestClient):
+        """POST /inbox/{id}/complete for nonexistent item must return 404."""
+        response = client.post("/inbox/99999/complete")
+        assert response.status_code == 404
+
+    def test_completed_inbox_item_excluded_from_list_by_default(self, client: TestClient):
+        """GET /inbox must not return completed inbox items by default."""
+        create_response = client.post("/inbox", json={"title": "To complete"})
+        item_id = create_response.json()["id"]
+
+        client.post(f"/inbox/{item_id}/complete")
+
+        response = client.get("/inbox")
+        assert response.status_code == 200
+        assert len(response.json()) == 0
+
+    def test_include_completed_shows_completed_inbox_items(self, client: TestClient):
+        """GET /inbox?include_completed=true must return completed inbox items."""
+        # Create two items, complete one
+        create_response = client.post("/inbox", json={"title": "Active item"})
+        complete_response = client.post("/inbox", json={"title": "Completed item"})
+        item_id = complete_response.json()["id"]
+        client.post(f"/inbox/{item_id}/complete")
+
+        response = client.get("/inbox?include_completed=true")
+        assert response.status_code == 200
+        items = response.json()
+        assert len(items) == 2
+        titles = {item["title"] for item in items}
+        assert "Active item" in titles
+        assert "Completed item" in titles
+
+    def test_include_completed_does_not_show_other_completed_items(self, client: TestClient):
+        """GET /inbox?include_completed=true must not return items completed from other statuses."""
+        # Create a next action and complete it
+        na_response = client.post("/next-actions", json={"title": "Completed next action"})
+        na_id = na_response.json()["id"]
+        client.post(f"/next-actions/{na_id}/complete")
+
+        # Create an inbox item
+        client.post("/inbox", json={"title": "Inbox item"})
+
+        response = client.get("/inbox?include_completed=true")
+        assert response.status_code == 200
+        items = response.json()
+        assert len(items) == 1
+        assert items[0]["title"] == "Inbox item"

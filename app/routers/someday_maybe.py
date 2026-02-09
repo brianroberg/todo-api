@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -23,13 +23,21 @@ class ActivateRequest(BaseModel):
 
 @router.get("", response_model=list[ItemResponse])
 def list_someday_maybe(
+    include_completed: bool = False,
     db: Session = Depends(get_db),
     api_key: ApiKey = Depends(get_current_api_key),
 ):
     """List all someday/maybe items."""
+    if include_completed:
+        status_filter = (Item.status == "someday_maybe") | (
+            (Item.status == "completed") & (Item.completed_from == "someday_maybe")
+        )
+    else:
+        status_filter = Item.status == "someday_maybe"
+
     items = (
         db.query(Item)
-        .filter(Item.api_key_id == api_key.id, Item.status == "someday_maybe")
+        .filter(Item.api_key_id == api_key.id, status_filter)
         .order_by(Item.priority.desc(), Item.created_at.desc())
         .all()
     )
@@ -151,6 +159,30 @@ def delete_someday_maybe(
 
     db.delete(item)
     db.commit()
+
+
+@router.post("/{item_id}/complete", response_model=ItemResponse)
+def complete_someday_maybe(
+    item_id: int,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(get_current_api_key),
+):
+    """Mark a someday/maybe item as complete."""
+    item = (
+        db.query(Item)
+        .filter(Item.id == item_id, Item.api_key_id == api_key.id, Item.status == "someday_maybe")
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Someday/maybe item not found")
+
+    item.completed_from = item.status
+    item.status = "completed"
+    item.completed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(item)
+
+    return item
 
 
 @router.post("/{item_id}/activate", response_model=ItemResponse)

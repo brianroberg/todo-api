@@ -14,13 +14,21 @@ router = APIRouter(prefix="/inbox", tags=["Inbox"])
 
 @router.get("", response_model=list[ItemResponse])
 def list_inbox(
+    include_completed: bool = False,
     db: Session = Depends(get_db),
     api_key: ApiKey = Depends(get_current_api_key),
 ):
     """List all items in the inbox (unprocessed items)."""
+    if include_completed:
+        status_filter = (Item.status == "inbox") | (
+            (Item.status == "completed") & (Item.completed_from == "inbox")
+        )
+    else:
+        status_filter = Item.status == "inbox"
+
     items = (
         db.query(Item)
-        .filter(Item.api_key_id == api_key.id, Item.status == "inbox")
+        .filter(Item.api_key_id == api_key.id, status_filter)
         .order_by(Item.created_at.desc())
         .all()
     )
@@ -125,6 +133,30 @@ def delete_inbox_item(
 
     db.delete(item)
     db.commit()
+
+
+@router.post("/{item_id}/complete", response_model=ItemResponse)
+def complete_inbox_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(get_current_api_key),
+):
+    """Mark an inbox item as complete."""
+    item = (
+        db.query(Item)
+        .filter(Item.id == item_id, Item.api_key_id == api_key.id, Item.status == "inbox")
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inbox item not found")
+
+    item.completed_from = item.status
+    item.status = "completed"
+    item.completed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(item)
+
+    return item
 
 
 @router.post("/{item_id}/process", response_model=ItemResponse)

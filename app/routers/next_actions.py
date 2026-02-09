@@ -20,15 +20,23 @@ def list_next_actions(
     max_time: int | None = Query(default=None, description="Max time estimate in minutes"),
     due_before: datetime | None = None,
     has_deadline: bool | None = None,
+    include_completed: bool = False,
     db: Session = Depends(get_db),
     api_key: ApiKey = Depends(get_current_api_key),
 ):
     """List all next actions with optional filters."""
     now = datetime.now(timezone.utc)
 
+    if include_completed:
+        status_filter = (Item.status == "next_action") | (
+            (Item.status == "completed") & (Item.completed_from == "next_action")
+        )
+    else:
+        status_filter = Item.status == "next_action"
+
     query = db.query(Item).filter(
         Item.api_key_id == api_key.id,
-        Item.status == "next_action",
+        status_filter,
         # Exclude tickler items that aren't yet due
         (Item.tickler_date.is_(None)) | (Item.tickler_date <= now),
     )
@@ -250,6 +258,7 @@ def complete_next_action(
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Next action not found")
 
+    item.completed_from = item.status
     item.status = "completed"
     item.completed_at = datetime.now(timezone.utc)
     db.commit()
