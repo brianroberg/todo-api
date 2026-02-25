@@ -111,6 +111,14 @@ GET  /auth/keys/current   - Get info about current API key
 DELETE /auth/keys/current - Revoke current API key
 ```
 
+### Utility
+
+```
+GET  /health              - Health check
+GET  /dashboard           - Web-based GTD dashboard (single-page app)
+GET  /events              - Server-Sent Events stream for real-time updates
+```
+
 ### GTD Endpoints
 
 ```
