@@ -1,6 +1,9 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.responses import JSONResponse
 
+from app.auth.dependencies import get_current_api_key
 from app.auth.router import router as auth_router
 from app.config import get_settings
 from app.database import Base, engine
@@ -26,8 +29,9 @@ app = FastAPI(
     title=settings.app_name,
     description="A RESTful API implementing David Allen's Getting Things Done (GTD) methodology",
     version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 # CORS middleware for development
@@ -51,6 +55,30 @@ app.include_router(tags_router)
 app.include_router(review_router)
 app.include_router(sse_router)
 app.include_router(dashboard_router)
+
+
+@app.get("/openapi.json", include_in_schema=False)
+def openapi_json(_api_key=Depends(get_current_api_key)):
+    """Authenticated OpenAPI schema endpoint."""
+    return JSONResponse(app.openapi())
+
+
+@app.get("/docs", include_in_schema=False)
+def docs(_api_key=Depends(get_current_api_key)):
+    """Authenticated Swagger UI endpoint."""
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title=f"{settings.app_name} - Swagger UI",
+    )
+
+
+@app.get("/redoc", include_in_schema=False)
+def redoc(_api_key=Depends(get_current_api_key)):
+    """Authenticated ReDoc endpoint."""
+    return get_redoc_html(
+        openapi_url="/openapi.json",
+        title=f"{settings.app_name} - ReDoc",
+    )
 
 
 @app.get("/", tags=["Health"])
