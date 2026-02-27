@@ -345,6 +345,82 @@ a.card { text-decoration: none; color: inherit; display: block; cursor: pointer;
   nav { order: 3; width: 100%; }
   .stats-grid { grid-template-columns: 1fr; }
 }
+
+/* Form modal fields */
+.cm-field { margin-bottom: 1rem; }
+.cm-field label {
+  display: block; font-size: .8125rem; font-weight: 500;
+  color: var(--gray-700); margin-bottom: .375rem;
+}
+.cm-field input, .cm-field textarea, .cm-field select {
+  width: 100%; padding: .5rem .75rem;
+  border: 1px solid var(--gray-300); border-radius: var(--radius);
+  font-size: .9375rem; font-family: var(--font);
+  outline: none; transition: border-color .15s;
+}
+.cm-field input:focus, .cm-field textarea:focus, .cm-field select:focus {
+  border-color: var(--blue); box-shadow: 0 0 0 3px rgb(37 99 235 / .15);
+}
+.cm-field textarea { resize: vertical; min-height: 80px; }
+.cm-multiselect {
+  border: 1px solid var(--gray-300); border-radius: var(--radius);
+  padding: .5rem; max-height: 140px; overflow-y: auto;
+}
+.cm-multiselect label {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .25rem 0; font-weight: 400; cursor: pointer;
+}
+.cm-multiselect input[type=checkbox] { width: auto; }
+.modal-cancel {
+  margin-top: .5rem; width: 100%; padding: .625rem;
+  background: none; color: var(--gray-600);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius); font-size: .9375rem;
+  cursor: pointer; transition: all .15s;
+}
+.modal-cancel:hover { background: var(--gray-100); }
+
+/* Card action buttons */
+.card-actions {
+  display: flex; gap: .375rem;
+  margin-top: .5rem; flex-wrap: wrap;
+}
+.btn-action {
+  padding: .25rem .625rem; border-radius: var(--radius);
+  font-size: .75rem; font-weight: 500; border: 1px solid;
+  cursor: pointer; transition: all .15s; line-height: 1.4;
+}
+.btn-complete {
+  background: var(--green-light); color: var(--green);
+  border-color: #a7f3d0;
+}
+.btn-complete:hover { background: #d1fae5; }
+.btn-edit {
+  background: var(--blue-light); color: var(--blue);
+  border-color: #bfdbfe;
+}
+.btn-edit:hover { background: #dbeafe; }
+.btn-delete {
+  background: var(--red-light); color: var(--red);
+  border-color: #fecaca;
+}
+.btn-delete:hover { background: #fee2e2; }
+.btn-new {
+  margin-left: auto; padding: .375rem .875rem;
+  background: var(--blue); color: #fff; border: none;
+  border-radius: var(--radius); font-size: .8125rem; font-weight: 500;
+  cursor: pointer; transition: background .15s;
+}
+.btn-new:hover { background: #1d4ed8; }
+
+/* Confirm dialog */
+.confirm-msg {
+  color: var(--gray-600); font-size: .9375rem;
+  margin-bottom: 1.25rem; line-height: 1.5;
+}
+.confirm-btns { display: flex; gap: .5rem; }
+.confirm-btns button { flex: 1; }
+.card > a { display: block; text-decoration: none; color: inherit; }
 </style>
 </head>
 <body>
@@ -381,6 +457,27 @@ a.card { text-decoration: none; color: inherit; display: block; cursor: pointer;
     </div>
   </header>
   <main id="view"></main>
+</div>
+
+<div id="crud-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:520px">
+    <h2 id="cm-title"></h2>
+    <div id="cm-body"></div>
+    <div id="cm-err" class="modal-error"></div>
+    <button id="cm-submit" class="modal-btn"></button>
+    <button id="cm-cancel" class="modal-cancel">Cancel</button>
+  </div>
+</div>
+
+<div id="confirm-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:380px">
+    <h2>Confirm</h2>
+    <p id="confirm-msg" class="confirm-msg"></p>
+    <div class="confirm-btns">
+      <button id="confirm-cancel" class="modal-cancel">Cancel</button>
+      <button id="confirm-ok" class="modal-btn" style="background:var(--red)">Delete</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -498,6 +595,45 @@ var api = {
   validateKey()             { return this.request("/auth/keys/current"); }
 };
 
+// ── API Mutations ───────────────────────────────────────────────
+api.mutate = async function(method, path, body) {
+  var opts = { method: method, headers: { "X-API-Key": this.key } };
+  if (body !== null && body !== undefined) {
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+  var resp = await fetch(path, opts);
+  if (resp.status === 401 || resp.status === 403) {
+    this.key = null; lsDel("gtd_api_key"); disconnectSSE(); showModal();
+    throw new Error("auth");
+  }
+  if (resp.status === 204) return null;
+  if (!resp.ok) {
+    var err;
+    try { err = (await resp.json()).detail; } catch(ex) { err = resp.statusText; }
+    throw new Error(err || resp.status);
+  }
+  return resp.json();
+};
+
+function statusToPath(status) {
+  if (status === "inbox") return "/inbox";
+  if (status === "next_action") return "/next-actions";
+  if (status === "someday_maybe") return "/someday-maybe";
+  return "/" + status;
+}
+
+api.createItem = function(status, body) { return this.mutate("POST", statusToPath(status), body); };
+api.updateItem = function(status, id, body) { return this.mutate("PATCH", statusToPath(status) + "/" + id, body); };
+api.deleteItem = function(status, id) { return this.mutate("DELETE", statusToPath(status) + "/" + id, null); };
+api.completeItem = function(status, id) { return this.mutate("POST", statusToPath(status) + "/" + id + "/complete", {}); };
+api.createProject = function(body) { return this.mutate("POST", "/projects", body); };
+api.updateProject = function(id, body) { return this.mutate("PATCH", "/projects/" + id, body); };
+api.deleteProject = function(id) { return this.mutate("DELETE", "/projects/" + id, null); };
+api.createTag = function(body) { return this.mutate("POST", "/tags", body); };
+api.updateTag = function(id, body) { return this.mutate("PATCH", "/tags/" + id, body); };
+api.deleteTag = function(id) { return this.mutate("DELETE", "/tags/" + id, null); };
+
 // ── DOM refs ───────────────────────────────────────────────────
 var $modal   = document.getElementById("api-key-modal");
 var $keyIn   = document.getElementById("key-input");
@@ -584,11 +720,278 @@ function disconnectSSE() {
   if (sse) { sse.close(); sse = null; }
 }
 
+// ── CRUD Modal refs ─────────────────────────────────────────────
+var $crudModal    = document.getElementById("crud-modal");
+var $cmTitle      = document.getElementById("cm-title");
+var $cmBody       = document.getElementById("cm-body");
+var $cmErr        = document.getElementById("cm-err");
+var $cmSubmit     = document.getElementById("cm-submit");
+var $cmCancel     = document.getElementById("cm-cancel");
+var $confirmModal = document.getElementById("confirm-modal");
+var $confirmMsg   = document.getElementById("confirm-msg");
+var $confirmOk    = document.getElementById("confirm-ok");
+var $confirmCancel = document.getElementById("confirm-cancel");
+
+// ── CRUD Modal ──────────────────────────────────────────────────
+// Note: innerHTML usage in _buildFields is safe because all user data passes
+// through esc() (DOM-based textContent escaping) before insertion.
+// The esc() function at line 394 prevents XSS by design.
+var modal = {
+  _onSubmit: null,
+  _submitLabel: "Save",
+
+  open: function(title, fields, submitLabel, onSubmit) {
+    $cmTitle.textContent = title;
+    this._submitLabel = submitLabel || "Save";
+    $cmSubmit.textContent = this._submitLabel;
+    this._onSubmit = onSubmit;
+    this._buildFields(fields);
+    $cmErr.style.display = "none";
+    $cmErr.textContent = "";
+    $cmSubmit.disabled = false;
+    $crudModal.style.display = "flex";
+    var first = $cmBody.querySelector("input,textarea,select");
+    if (first) first.focus();
+  },
+
+  close: function() {
+    $crudModal.style.display = "none";
+    $cmBody.textContent = "";
+    this._onSubmit = null;
+  },
+
+  _buildFields: function(fields) {
+    // All user-provided values are escaped via esc() before DOM insertion
+    var html = fields.map(function(f) {
+      var id = "cm-f-" + f.name;
+      var inner = "";
+      if (f.type === "text" || f.type === "color") {
+        inner = '<input type="' + f.type + '" id="' + id + '" name="' + f.name + '"' +
+          (f.required ? " required" : "") +
+          ' value="' + esc(f.value || "") + '">';
+      } else if (f.type === "date") {
+        inner = '<input type="date" id="' + id + '" name="' + f.name + '" value="' + esc(f.value || "") + '">';
+      } else if (f.type === "textarea") {
+        inner = '<textarea id="' + id + '" name="' + f.name + '">' + esc(f.value || "") + "</textarea>";
+      } else if (f.type === "select") {
+        inner = '<select id="' + id + '" name="' + f.name + '">' +
+          (f.options || []).map(function(o) {
+            return '<option value="' + esc(String(o.value)) + '"' +
+              (String(o.value) === String(f.value) ? " selected" : "") + '>' + esc(o.label) + "</option>";
+          }).join("") + "</select>";
+      } else if (f.type === "multiselect") {
+        var selected = f.value || [];
+        inner = '<div class="cm-multiselect">' +
+          (f.options || []).map(function(o) {
+            var chk = selected.indexOf(o.value) !== -1 ? " checked" : "";
+            var dot = o.color ? '<span class="tag-dot" style="background:' + o.color + '"></span>' : "";
+            return '<label><input type="checkbox" name="' + f.name + '" value="' + parseInt(o.value) + '"' + chk + '>' + dot + esc(o.label) + "</label>";
+          }).join("") + "</div>";
+      }
+      return '<div class="cm-field"><label for="' + id + '">' + esc(f.label) + (f.required ? ' <span style="color:var(--red)">*</span>' : "") + "</label>" + inner + "</div>";
+    }).join("");
+    $cmBody.textContent = "";
+    $cmBody.insertAdjacentHTML("afterbegin", html);
+  },
+
+  getValues: function() {
+    var out = {};
+    var els = $cmBody.querySelectorAll("[name]");
+    var multis = {};
+    els.forEach(function(el) {
+      if (el.type === "checkbox") {
+        if (!multis[el.name]) multis[el.name] = [];
+        if (el.checked) multis[el.name].push(parseInt(el.value));
+      } else if (el.type === "date") {
+        out[el.name] = el.value ? el.value + "T00:00:00" : null;
+      } else {
+        out[el.name] = el.value || null;
+      }
+    });
+    Object.keys(multis).forEach(function(k) { out[k] = multis[k]; });
+    if (out.project_id) out.project_id = parseInt(out.project_id) || null;
+    return out;
+  },
+
+  showError: function(msg) {
+    $cmErr.textContent = msg;
+    $cmErr.style.display = "block";
+  },
+
+  setLoading: function(on) {
+    $cmSubmit.disabled = on;
+    $cmSubmit.textContent = on ? "Saving..." : this._submitLabel;
+  }
+};
+
+$cmCancel.addEventListener("click", function() { modal.close(); });
+$crudModal.addEventListener("click", function(e) { if (e.target === $crudModal) modal.close(); });
+$cmSubmit.addEventListener("click", async function() {
+  if (!modal._onSubmit) return;
+  var required = $cmBody.querySelectorAll("[required]");
+  var missing = false;
+  required.forEach(function(el) {
+    if (!el.value.trim()) { el.style.borderColor = "var(--red)"; missing = true; }
+    else { el.style.borderColor = ""; }
+  });
+  if (missing) { modal.showError("Please fill in all required fields"); return; }
+  var vals = modal.getValues();
+  $cmErr.style.display = "none";
+  modal.setLoading(true);
+  try {
+    await modal._onSubmit(vals);
+    modal.close();
+    cache = {}; route();
+  } catch(e) {
+    if (e.message !== "auth") modal.showError(e.message || "An error occurred");
+  } finally {
+    modal.setLoading(false);
+  }
+});
+
+// ── Confirm Dialog ──────────────────────────────────────────────
+var confirmCallback = null;
+
+function showConfirm(msg, onOk, btnLabel, btnColor) {
+  $confirmMsg.textContent = msg;
+  $confirmOk.textContent = btnLabel || "Delete";
+  $confirmOk.style.background = btnColor || "var(--red)";
+  confirmCallback = onOk;
+  $confirmModal.style.display = "flex";
+}
+
+$confirmCancel.addEventListener("click", function() {
+  $confirmModal.style.display = "none";
+  confirmCallback = null;
+});
+$confirmOk.addEventListener("click", async function() {
+  $confirmModal.style.display = "none";
+  if (confirmCallback) {
+    try { await confirmCallback(); cache = {}; route(); } catch(e) { if (e.message !== "auth") showErr(e); }
+    confirmCallback = null;
+  }
+});
+$confirmModal.addEventListener("click", function(e) {
+  if (e.target === $confirmModal) { $confirmModal.style.display = "none"; confirmCallback = null; }
+});
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") {
+    if ($crudModal.style.display !== "none") modal.close();
+    else if ($confirmModal.style.display !== "none") {
+      $confirmModal.style.display = "none"; confirmCallback = null;
+    }
+  }
+});
+
+// ── Field Factories ─────────────────────────────────────────────
+function itemFields(item, projects, tags) {
+  var projectOpts = [{value: "", label: "None"}].concat(
+    (projects || []).map(function(p) { return {value: p.id, label: p.title}; })
+  );
+  var tagOpts = (tags || []).map(function(t) {
+    return {value: t.id, label: t.name, color: validColor(t.color)};
+  });
+  var selectedTagIds = item ? item.tags.map(function(t) { return t.id; }) : [];
+  return [
+    {name:"title",        label:"Title",        type:"text",        required:true,  value: item ? item.title : ""},
+    {name:"notes",        label:"Notes",        type:"textarea",    required:false, value: item ? (item.notes || "") : ""},
+    {name:"project_id",   label:"Project",      type:"select",      required:false, options: projectOpts, value: item ? (item.project_id || "") : ""},
+    {name:"tag_ids",      label:"Tags",         type:"multiselect", required:false, options: tagOpts, value: selectedTagIds},
+    {name:"energy_level", label:"Energy Level", type:"select",      required:false, options: [{value:"",label:"Any"},{value:"low",label:"Low"},{value:"medium",label:"Medium"},{value:"high",label:"High"}], value: item ? (item.energy_level || "") : ""},
+    {name:"due_date",     label:"Due Date",     type:"date",        required:false, value: item && item.due_date ? item.due_date.slice(0,10) : ""}
+  ];
+}
+
+function projectFields(project) {
+  return [
+    {name:"title",       label:"Title",       type:"text",     required:true,  value: project ? project.title : ""},
+    {name:"description", label:"Description", type:"textarea", required:false, value: project ? (project.description || "") : ""},
+    {name:"outcome",     label:"Outcome",     type:"textarea", required:false, value: project ? (project.outcome || "") : ""},
+    {name:"status",      label:"Status",      type:"select",   required:false, options: [{value:"active",label:"Active"},{value:"on_hold",label:"On Hold"},{value:"completed",label:"Completed"}], value: project ? project.status : "active"},
+    {name:"due_date",    label:"Due Date",    type:"date",     required:false, value: project && project.due_date ? project.due_date.slice(0,10) : ""}
+  ];
+}
+
+function tagFields(tag) {
+  return [
+    {name:"name",  label:"Tag Name", type:"text",  required:true,  value: tag ? tag.name : ""},
+    {name:"color", label:"Color",    type:"color", required:false, value: tag && tag.color ? tag.color : "#6b7280"}
+  ];
+}
+
+// ── CRUD Handlers ───────────────────────────────────────────────
+async function handleNewItem(status) {
+  var projects = cache.projectList || (cache.projectList = await api.getProjects());
+  var tags = cache.tags || (cache.tags = await api.getTags());
+  modal.open("New Item", itemFields(null, projects, tags), "Create", async function(vals) {
+    await api.createItem(status, vals);
+  });
+}
+
+async function handleEdit(status, id) {
+  var item = await api.request(statusToPath(status) + "/" + id);
+  var projects = cache.projectList || (cache.projectList = await api.getProjects());
+  var tags = cache.tags || (cache.tags = await api.getTags());
+  modal.open("Edit Item", itemFields(item, projects, tags), "Save", async function(vals) {
+    await api.updateItem(status, id, vals);
+  });
+}
+
+function handleDelete(status, id, title) {
+  showConfirm('Delete "' + title + '"?', async function() {
+    await api.deleteItem(status, id);
+  });
+}
+
+function handleComplete(status, id, title) {
+  showConfirm('Mark "' + title + '" as done?', async function() {
+    await api.completeItem(status, id);
+  }, "Done", "var(--green)");
+}
+
+async function handleNewProject() {
+  modal.open("New Project", projectFields(null), "Create", async function(vals) {
+    await api.createProject(vals);
+  });
+}
+
+async function handleEditProject(id) {
+  var project = await api.getProject(id);
+  modal.open("Edit Project", projectFields(project), "Save", async function(vals) {
+    await api.updateProject(id, vals);
+  });
+}
+
+function handleDeleteProject(id, title) {
+  showConfirm('Delete project "' + title + '"? All actions will be unlinked.', async function() {
+    await api.deleteProject(id);
+  });
+}
+
+function handleNewTag() {
+  modal.open("New Tag", tagFields(null), "Create", async function(vals) {
+    await api.createTag(vals);
+  });
+}
+
+async function handleEditTag(id) {
+  var tag = await api.getTag(id);
+  modal.open("Edit Tag", tagFields(tag), "Save", async function(vals) {
+    await api.updateTag(id, vals);
+  });
+}
+
+function handleDeleteTag(id, title) {
+  showConfirm('Delete tag "' + title + '"? It will be removed from all items.', async function() {
+    await api.deleteTag(id);
+  });
+}
+
 // ── Cache ──────────────────────────────────────────────────────
 var cache = {};
 
 // ── Render helpers ─────────────────────────────────────────────
-function itemCard(item) {
+function itemCard(item, statusSlug) {
   var meta = [];
   if (item.tags) item.tags.forEach(function(t) { meta.push(tagHtml(t)); });
   if (item.due_date) meta.push(dueBadge(item.due_date, item.due_date_is_hard));
@@ -597,10 +1000,22 @@ function itemCard(item) {
   if (item.delegated_to) meta.push('<span class="badge badge-orange">&#x21e8; ' + esc(item.delegated_to) + "</span>");
   if (item.project_id) meta.push('<span class="badge badge-blue">project #' + item.project_id + "</span>");
 
+  var actions = "";
+  if (statusSlug) {
+    var t = esc(item.title);
+    var sa = 'data-id="' + parseInt(item.id) + '" data-status="' + esc(statusSlug) + '"';
+    actions = '<div class="card-actions">' +
+      '<button class="btn-action btn-complete" data-action="complete" ' + sa + ' data-title="' + t + '">Done</button>' +
+      '<button class="btn-action btn-edit" data-action="edit" ' + sa + '>Edit</button>' +
+      '<button class="btn-action btn-delete" data-action="delete" ' + sa + ' data-title="' + t + '">Delete</button>' +
+    "</div>";
+  }
+
   return '<div class="card">' +
     '<div class="card-title">' + esc(item.title) + "</div>" +
     (item.notes ? '<div class="card-notes">' + esc(item.notes) + "</div>" : "") +
     (meta.length ? '<div class="card-meta">' + meta.join(" ") + "</div>" : "") +
+    actions +
     "</div>";
 }
 
@@ -609,8 +1024,10 @@ function projectCard(p) {
   var done = p.completed_action_count || 0;
   var total = p.action_count || 0;
   var hasStats = typeof p.action_count !== "undefined";
-  return '<a class="card" href="#projects/' + parseInt(p.id) + '">' +
-    '<div class="card-title">' + esc(p.title) + "</div>" +
+  var t = esc(p.title);
+  return '<div class="card">' +
+    '<a href="#projects/' + parseInt(p.id) + '">' +
+    '<div class="card-title">' + t + "</div>" +
     (p.description ? '<div class="card-notes">' + esc(p.description) + "</div>" : "") +
     '<div class="card-meta">' +
       '<span class="badge ' + statusCls + '">' + esc(p.status.replace("_", " ")) + "</span>" +
@@ -619,7 +1036,11 @@ function projectCard(p) {
       (p.due_date ? " " + dueBadge(p.due_date, p.due_date_is_hard) : "") +
     "</div>" +
     (hasStats ? progressBar(done, total) : "") +
-    "</a>";
+    "</a>" +
+    '<div class="card-actions">' +
+      '<button class="btn-action btn-edit" data-action="edit-project" data-id="' + parseInt(p.id) + '">Edit</button>' +
+      '<button class="btn-action btn-delete" data-action="delete-project" data-id="' + parseInt(p.id) + '" data-title="' + t + '">Delete</button>' +
+    "</div></div>";
 }
 
 function areaCard(a) {
@@ -637,9 +1058,9 @@ async function viewInbox() {
   $view.innerHTML = loader();
   try {
     var items = cache.inbox || (cache.inbox = await api.getInbox());
-    var h = '<div class="view-header"><h2>Inbox</h2><span class="count-badge">' + items.length + "</span></div>";
+    var h = '<div class="view-header"><h2>Inbox</h2><span class="count-badge">' + items.length + '</span><button class="btn-new" data-action="new-item" data-status="inbox">+ New</button></div>';
     if (!items.length) { $view.innerHTML = h + emptyMsg("&#x1f4e5;", "Inbox is empty"); return; }
-    $view.innerHTML = h + items.map(itemCard).join("");
+    $view.innerHTML = h + items.map(function(i) { return itemCard(i, "inbox"); }).join("");
   } catch (e) { showErr(e); }
 }
 
@@ -652,7 +1073,7 @@ async function viewNextActions() {
 
     var items = cache.nextActions || (cache.nextActions = await api.getNextActions());
 
-    var h = '<div class="view-header"><h2>Next Actions</h2><span class="count-badge">' + items.length + "</span></div>";
+    var h = '<div class="view-header"><h2>Next Actions</h2><span class="count-badge">' + items.length + '</span><button class="btn-new" data-action="new-item" data-status="next_action">+ New</button></div>';
 
     h += '<div class="filter-bar">' +
       '<select id="f-tag"><option value="">All tags</option>' +
@@ -669,7 +1090,7 @@ async function viewNextActions() {
       "</select>" +
     "</div>";
 
-    h += '<div id="na-list">' + (items.length ? items.map(itemCard).join("") : emptyMsg("&#x2705;", "No next actions")) + "</div>";
+    h += '<div id="na-list">' + (items.length ? items.map(function(i) { return itemCard(i, "next_action"); }).join("") : emptyMsg("&#x2705;", "No next actions")) + "</div>";
     $view.innerHTML = h;
 
     ["f-tag", "f-project", "f-area", "f-energy"].forEach(function(id) {
@@ -692,7 +1113,7 @@ async function applyNAFilters() {
   try {
     var items = await api.getNextActions(qs);
     var list = document.getElementById("na-list");
-    if (list) list.innerHTML = items.length ? items.map(itemCard).join("") : emptyMsg("&#x1f50d;", "No actions match filters");
+    if (list) list.innerHTML = items.length ? items.map(function(i) { return itemCard(i, "next_action"); }).join("") : emptyMsg("&#x1f50d;", "No actions match filters");
   } catch (e) { showErr(e); }
 }
 
@@ -706,7 +1127,7 @@ async function viewProjects() {
       active = status;
       var tabs = ["active", "on_hold", "completed"];
       var filtered = all.filter(function(p) { return p.status === status; });
-      var h = '<div class="view-header"><h2>Projects</h2><span class="count-badge">' + all.length + "</span></div>";
+      var h = '<div class="view-header"><h2>Projects</h2><span class="count-badge">' + all.length + '</span><button class="btn-new" data-action="new-project">+ New Project</button></div>';
       h += '<div class="tabs">' + tabs.map(function(t) {
         var cnt = all.filter(function(p) { return p.status === t; }).length;
         return '<button class="tab' + (t === active ? " active" : "") + '" data-tab="' + t + '">' + esc(t.replace("_", " ")) + " (" + cnt + ")</button>";
@@ -747,7 +1168,7 @@ async function viewProjectDetail(id) {
     order.forEach(function(s) {
       if (grouped[s] && grouped[s].length) {
         h += '<div class="section-label">' + esc(labels[s]) + " (" + grouped[s].length + ")</div>";
-        h += grouped[s].map(itemCard).join("");
+        h += grouped[s].map(function(a) { return itemCard(a, s === "completed" ? null : a.status); }).join("");
       }
     });
 
@@ -760,9 +1181,9 @@ async function viewSomeday() {
   $view.innerHTML = loader();
   try {
     var items = cache.someday || (cache.someday = await api.getSomeday());
-    var h = '<div class="view-header"><h2>Someday / Maybe</h2><span class="count-badge">' + items.length + "</span></div>";
+    var h = '<div class="view-header"><h2>Someday / Maybe</h2><span class="count-badge">' + items.length + '</span><button class="btn-new" data-action="new-item" data-status="someday_maybe">+ New</button></div>';
     if (!items.length) { $view.innerHTML = h + emptyMsg("&#x1f4ad;", "No someday/maybe items"); return; }
-    $view.innerHTML = h + items.map(itemCard).join("");
+    $view.innerHTML = h + items.map(function(i) { return itemCard(i, "someday_maybe"); }).join("");
   } catch (e) { showErr(e); }
 }
 
@@ -841,15 +1262,21 @@ async function viewTags() {
   $view.innerHTML = loader();
   try {
     var tags = cache.tags || (cache.tags = await api.getTags());
-    var h = '<div class="view-header"><h2>Tags</h2><span class="count-badge">' + tags.length + "</span></div>";
+    var h = '<div class="view-header"><h2>Tags</h2><span class="count-badge">' + tags.length + '</span><button class="btn-new" data-action="new-tag">+ New Tag</button></div>';
     if (!tags.length) { $view.innerHTML = h + emptyMsg("&#x1f3f7;", "No tags defined"); return; }
-    h += '<div style="display:flex;flex-wrap:wrap;gap:.5rem">';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:.75rem">';
     tags.forEach(function(t) {
       var bg = validColor(t.color) || "#6b7280";
-      h += '<a href="#tags/' + parseInt(t.id) + '" style="text-decoration:none">' +
+      var tEsc = esc(t.name);
+      h += '<div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:.25rem">' +
+        '<a href="#tags/' + parseInt(t.id) + '" style="text-decoration:none">' +
         '<span class="tag" style="font-size:.8125rem;padding:.375rem .75rem;background:' + bg + '22;border:1px solid ' + bg + '44">' +
         '<span class="tag-dot" style="background:' + bg + '"></span>' +
-        esc(t.name) + " (" + (t.item_count || 0) + ")</span></a>";
+        tEsc + " (" + (t.item_count || 0) + ")</span></a>" +
+        '<div style="display:flex;gap:.25rem">' +
+        '<button class="btn-action btn-edit" data-action="edit-tag" data-id="' + parseInt(t.id) + '" style="font-size:.6875rem;padding:.125rem .5rem">Edit</button>' +
+        '<button class="btn-action btn-delete" data-action="delete-tag" data-id="' + parseInt(t.id) + '" data-title="' + tEsc + '" style="font-size:.6875rem;padding:.125rem .5rem">Delete</button>' +
+        "</div></div>";
     });
     h += "</div>";
     $view.innerHTML = h;
@@ -874,7 +1301,7 @@ async function viewTagDetail(id) {
     order.forEach(function(s) {
       if (grouped[s] && grouped[s].length) {
         h += '<div class="section-label">' + esc(labels[s]) + " (" + grouped[s].length + ")</div>";
-        h += grouped[s].map(itemCard).join("");
+        h += grouped[s].map(function(a) { return itemCard(a, s === "completed" ? null : s); }).join("");
       }
     });
     $view.innerHTML = h;
@@ -959,6 +1386,30 @@ async function viewReview() {
 
   Promise.allSettled(tasks);
 }
+
+// ── CRUD event delegation ───────────────────────────────────────
+$view.addEventListener("click", function(e) {
+  var btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  e.preventDefault();
+  var action = btn.dataset.action;
+  var id     = btn.dataset.id ? parseInt(btn.dataset.id) : null;
+  var status = btn.dataset.status || null;
+  var title  = btn.dataset.title || "";
+
+  switch (action) {
+    case "complete":       handleComplete(status, id, title); break;
+    case "edit":           handleEdit(status, id); break;
+    case "delete":         handleDelete(status, id, title); break;
+    case "edit-project":   handleEditProject(id); break;
+    case "delete-project": handleDeleteProject(id, title); break;
+    case "new-project":    handleNewProject(); break;
+    case "edit-tag":       handleEditTag(id); break;
+    case "delete-tag":     handleDeleteTag(id, title); break;
+    case "new-tag":        handleNewTag(); break;
+    case "new-item":       handleNewItem(status); break;
+  }
+});
 
 // ── Error display ──────────────────────────────────────────────
 function showErr(e) {
