@@ -1,4 +1,4 @@
-"""Tests for the read-only GTD dashboard frontend."""
+"""Tests for the GTD dashboard frontend with CRUD capabilities."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -247,3 +247,171 @@ class TestDashboardHTMLContent:
         from app.routers.dashboard import HTML_CONTENT
         assert 'rel="stylesheet"' not in HTML_CONTENT
         assert "<script src=" not in HTML_CONTENT
+
+
+class TestDashboardCRUDInfrastructure:
+    """Tests for CRUD modal infrastructure in the dashboard."""
+
+    def test_dashboard_contains_crud_modal(self, client: TestClient):
+        """Dashboard must include the CRUD form modal overlay."""
+        response = client.get("/dashboard")
+        assert 'id="crud-modal"' in response.text
+
+    def test_dashboard_contains_confirm_modal(self, client: TestClient):
+        """Dashboard must include the delete confirmation modal."""
+        response = client.get("/dashboard")
+        assert 'id="confirm-modal"' in response.text
+
+    def test_dashboard_contains_api_mutate_method(self, client: TestClient):
+        """Dashboard must include api.mutate for POST/PATCH/DELETE requests."""
+        response = client.get("/dashboard")
+        assert "api.mutate" in response.text
+
+    def test_dashboard_contains_modal_open_close(self, client: TestClient):
+        """Dashboard must include modal open and close methods."""
+        html = client.get("/dashboard").text
+        assert "modal.open" in html or "open:" in html
+        assert "modal.close" in html or "close:" in html
+
+    def test_dashboard_contains_show_confirm(self, client: TestClient):
+        """Dashboard must include showConfirm function for delete dialogs."""
+        response = client.get("/dashboard")
+        assert "function showConfirm(" in response.text
+
+    def test_dashboard_contains_status_to_path(self, client: TestClient):
+        """Dashboard must include statusToPath mapping function."""
+        response = client.get("/dashboard")
+        assert "function statusToPath(" in response.text
+
+    def test_dashboard_contains_item_fields_factory(self, client: TestClient):
+        """Dashboard must include itemFields factory for item form fields."""
+        response = client.get("/dashboard")
+        assert "function itemFields(" in response.text
+
+    def test_dashboard_contains_project_fields_factory(self, client: TestClient):
+        """Dashboard must include projectFields factory for project form fields."""
+        response = client.get("/dashboard")
+        assert "function projectFields(" in response.text
+
+    def test_dashboard_contains_tag_fields_factory(self, client: TestClient):
+        """Dashboard must include tagFields factory for tag form fields."""
+        response = client.get("/dashboard")
+        assert "function tagFields(" in response.text
+
+    def test_dashboard_contains_crud_handler_functions(self, client: TestClient):
+        """Dashboard must include handler functions for CRUD operations."""
+        html = client.get("/dashboard").text
+        assert "function handleNewItem(" in html
+        assert "function handleEdit(" in html
+        assert "function handleDelete(" in html
+        assert "function handleComplete(" in html
+        assert "function handleNewProject(" in html
+        assert "function handleEditProject(" in html
+        assert "function handleDeleteProject(" in html
+        assert "function handleNewTag(" in html
+        assert "function handleEditTag(" in html
+        assert "function handleDeleteTag(" in html
+
+    def test_dashboard_contains_event_delegation(self, client: TestClient):
+        """Dashboard must use event delegation on $view for CRUD actions."""
+        html = client.get("/dashboard").text
+        assert 'closest("[data-action]")' in html
+
+
+class TestDashboardCRUDButtons:
+    """Tests for CRUD button styles and data attributes in the dashboard."""
+
+    def test_dashboard_contains_btn_new_css(self, client: TestClient):
+        """Dashboard must include CSS for new-item buttons."""
+        assert ".btn-new" in client.get("/dashboard").text
+
+    def test_dashboard_contains_btn_action_css(self, client: TestClient):
+        """Dashboard must include CSS for card action buttons."""
+        assert ".btn-action" in client.get("/dashboard").text
+
+    def test_dashboard_contains_btn_complete_css(self, client: TestClient):
+        """Dashboard must include CSS for complete buttons."""
+        assert ".btn-complete" in client.get("/dashboard").text
+
+    def test_dashboard_contains_btn_edit_css(self, client: TestClient):
+        """Dashboard must include CSS for edit buttons."""
+        assert ".btn-edit" in client.get("/dashboard").text
+
+    def test_dashboard_contains_btn_delete_css(self, client: TestClient):
+        """Dashboard must include CSS for delete buttons."""
+        assert ".btn-delete" in client.get("/dashboard").text
+
+    def test_dashboard_contains_form_field_css(self, client: TestClient):
+        """Dashboard must include CSS for modal form fields."""
+        assert ".cm-field" in client.get("/dashboard").text
+
+    def test_dashboard_contains_multiselect_css(self, client: TestClient):
+        """Dashboard must include CSS for multiselect tag picker."""
+        assert ".cm-multiselect" in client.get("/dashboard").text
+
+    def test_dashboard_contains_card_actions_class(self, client: TestClient):
+        """Dashboard must include card-actions container class."""
+        assert "card-actions" in client.get("/dashboard").text
+
+    def test_dashboard_contains_data_action_attributes(self, client: TestClient):
+        """Dashboard must emit data-action attributes for event delegation."""
+        html = client.get("/dashboard").text
+        assert 'data-action="complete"' in html
+        assert 'data-action="edit"' in html
+        assert 'data-action="delete"' in html
+
+    def test_dashboard_contains_new_project_button(self, client: TestClient):
+        """Dashboard must include a new-project action button."""
+        assert 'data-action="new-project"' in client.get("/dashboard").text
+
+    def test_dashboard_contains_new_tag_button(self, client: TestClient):
+        """Dashboard must include a new-tag action button."""
+        assert 'data-action="new-tag"' in client.get("/dashboard").text
+
+    def test_dashboard_contains_new_item_button(self, client: TestClient):
+        """Dashboard must include new-item action buttons."""
+        assert 'data-action="new-item"' in client.get("/dashboard").text
+
+
+class TestDashboardMutationAPI:
+    """Tests for mutation API methods in the dashboard JavaScript."""
+
+    def test_dashboard_api_create_item(self, client: TestClient):
+        """Dashboard must include createItem API method."""
+        assert "createItem(" in client.get("/dashboard").text
+
+    def test_dashboard_api_update_item(self, client: TestClient):
+        """Dashboard must include updateItem API method."""
+        assert "updateItem(" in client.get("/dashboard").text
+
+    def test_dashboard_api_delete_item(self, client: TestClient):
+        """Dashboard must include deleteItem API method."""
+        assert "deleteItem(" in client.get("/dashboard").text
+
+    def test_dashboard_api_complete_item(self, client: TestClient):
+        """Dashboard must include completeItem API method."""
+        assert "completeItem(" in client.get("/dashboard").text
+
+    def test_dashboard_api_create_project(self, client: TestClient):
+        """Dashboard must include createProject API method."""
+        assert "createProject(" in client.get("/dashboard").text
+
+    def test_dashboard_api_update_project(self, client: TestClient):
+        """Dashboard must include updateProject API method."""
+        assert "updateProject(" in client.get("/dashboard").text
+
+    def test_dashboard_api_delete_project(self, client: TestClient):
+        """Dashboard must include deleteProject API method."""
+        assert "deleteProject(" in client.get("/dashboard").text
+
+    def test_dashboard_api_create_tag(self, client: TestClient):
+        """Dashboard must include createTag API method."""
+        assert "createTag(" in client.get("/dashboard").text
+
+    def test_dashboard_api_update_tag(self, client: TestClient):
+        """Dashboard must include updateTag API method."""
+        assert "updateTag(" in client.get("/dashboard").text
+
+    def test_dashboard_api_delete_tag(self, client: TestClient):
+        """Dashboard must include deleteTag API method."""
+        assert "deleteTag(" in client.get("/dashboard").text
