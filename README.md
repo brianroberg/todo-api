@@ -40,6 +40,15 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
+Key environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | SQLite database path | `sqlite:///./gtd.db` |
+| `ADMIN_KEY` | Required for creating API keys in production | _(none)_ |
+| `DONOR_DB_URL` | Base URL of the Donor Management DB API | _(none)_ |
+| `DONOR_DB_API_KEY` | API key for authenticating to the Donor DB | _(none)_ |
+
 ### Running Locally
 
 ```bash
@@ -130,6 +139,7 @@ GET  /events              - Server-Sent Events stream for real-time updates
 /areas            - Areas of responsibility
 /tags             - Flexible categorization
 /review           - Weekly review helpers
+/donor-tasks      - Donor DB task integration
 ```
 
 ### Example: GTD Workflow
@@ -234,6 +244,8 @@ todo-api/
 │   │   └── models.py     # SQLAlchemy models
 │   ├── schemas/
 │   │   └── schemas.py    # Pydantic request/response models
+│   ├── services/
+│   │   └── donor_client.py  # HTTP client for Donor DB integration
 │   └── routers/
 │       ├── inbox.py
 │       ├── next_actions.py
@@ -242,7 +254,8 @@ todo-api/
 │       ├── tickler.py
 │       ├── areas.py
 │       ├── tags.py
-│       └── review.py
+│       ├── review.py
+│       └── donor_tasks.py   # Donor DB task endpoints
 ├── pyproject.toml
 ├── Dockerfile
 ├── fly.toml
