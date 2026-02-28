@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # If set, this key is required to create new API keys
     admin_key: str | None = None
 
+    # Donor DB integration
+    donor_db_url: str = ""
+    donor_db_api_key: str = ""
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

@@ -10,6 +10,7 @@ from app.database import Base, engine
 from app.routers import (
     areas_router,
     dashboard_router,
+    donor_tasks_router,
     inbox_router,
     next_actions_router,
     projects_router,
@@ -55,6 +56,7 @@ app.include_router(tags_router)
 app.include_router(review_router)
 app.include_router(sse_router)
 app.include_router(dashboard_router)
+app.include_router(donor_tasks_router)
 
 
 @app.get("/openapi.json", include_in_schema=False)

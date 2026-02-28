@@ -130,6 +130,7 @@ GET  /events              - Server-Sent Events stream for real-time updates
 /areas            - Areas of responsibility
 /tags             - Flexible categorization
 /review           - Weekly review helpers
+/donor-tasks      - Donor DB task integration
 ```
 
 ### Example: GTD Workflow
