@@ -47,6 +47,7 @@ class TestDashboardNavigation:
         html = response.text
         assert 'href="#inbox"' in html
         assert 'href="#next-actions"' in html
+        assert 'href="#donor-tasks"' in html
         assert 'href="#projects"' in html
         assert 'href="#someday"' in html
         assert 'href="#tickler"' in html
@@ -102,6 +103,11 @@ class TestDashboardSecurity:
         assert "function esc(" in html
         assert "textContent" in html
 
+    def test_dashboard_contains_attribute_escape_function(self, client: TestClient):
+        """Dashboard JS must include escAttr for safe HTML attribute escaping."""
+        response = client.get("/dashboard")
+        assert "function escAttr(" in response.text
+
     def test_dashboard_contains_color_validation(self, client: TestClient):
         """Dashboard must validate color values to prevent CSS injection."""
         response = client.get("/dashboard")
@@ -142,6 +148,7 @@ class TestDashboardJavaScript:
         assert "getTags()" in html
         assert "getTag(" in html
         assert "getTagItems(" in html
+        assert "getDonorTasks()" in html
 
     def test_dashboard_contains_review_api_methods(self, client: TestClient):
         """Dashboard must include API client methods for review endpoints."""
@@ -178,6 +185,7 @@ class TestDashboardJavaScript:
         assert "function viewTags()" in html
         assert "function viewTagDetail(" in html
         assert "function viewReview()" in html
+        assert "function viewDonorTasks()" in html
 
     def test_dashboard_validates_key_on_connect(self, client: TestClient):
         """Dashboard must validate the API key against /auth/keys/current."""
@@ -415,3 +423,31 @@ class TestDashboardMutationAPI:
     def test_dashboard_api_delete_tag(self, client: TestClient):
         """Dashboard must include deleteTag API method."""
         assert "deleteTag(" in client.get("/dashboard").text
+
+    def test_dashboard_api_get_donor_tasks(self, client: TestClient):
+        """Dashboard must include getDonorTasks API method."""
+        assert "getDonorTasks()" in client.get("/dashboard").text
+
+    def test_dashboard_api_update_donor_status(self, client: TestClient):
+        """Dashboard must include updateDonorStatus API method."""
+        assert "updateDonorStatus(" in client.get("/dashboard").text
+
+
+class TestDashboardDonorTasks:
+    """Tests for donor task integration in the dashboard."""
+
+    def test_dashboard_contains_donor_task_card_renderer(self, client: TestClient):
+        """Dashboard must include donorTaskCard rendering function."""
+        assert "function donorTaskCard(" in client.get("/dashboard").text
+
+    def test_dashboard_contains_donor_complete_action(self, client: TestClient):
+        """Dashboard must handle donor-complete action in event delegation."""
+        assert 'data-action="donor-complete"' in client.get("/dashboard").text
+
+    def test_dashboard_contains_donor_cancel_action(self, client: TestClient):
+        """Dashboard must handle donor-cancel action in event delegation."""
+        assert 'data-action="donor-cancel"' in client.get("/dashboard").text
+
+    def test_dashboard_donor_tasks_route(self, client: TestClient):
+        """Dashboard router must handle the donor-tasks hash route."""
+        assert '"donor-tasks"' in client.get("/dashboard").text

@@ -442,6 +442,7 @@ a.card { text-decoration: none; color: inherit; display: block; cursor: pointer;
       <nav id="main-nav">
         <a href="#inbox">Inbox</a>
         <a href="#next-actions">Next Actions</a>
+        <a href="#donor-tasks">Donor Tasks</a>
         <a href="#projects">Projects</a>
         <a href="#someday">Someday</a>
         <a href="#tickler">Tickler</a>
@@ -517,6 +518,11 @@ function lsGet(k) { try { return localStorage.getItem(k); } catch(e) { return nu
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch(e) {} }
 function lsDel(k) { try { localStorage.removeItem(k); } catch(e) {} }
 
+function escAttr(s) {
+  if (!s) return "";
+  return esc(s).replace(/"/g, "&quot;");
+}
+
 function validColor(c) {
   return c && /^#[0-9A-Fa-f]{6}$/.test(c) ? c : null;
 }
@@ -587,6 +593,7 @@ var api = {
   getTags()                 { return this.request("/tags"); },
   getTagItems(id)           { return this.request("/tags/" + id + "/items"); },
   getTag(id)                { return this.request("/tags/" + id); },
+  getDonorTasks()           { return this.request("/donor-tasks"); },
   reviewInbox()             { return this.request("/review/inbox-count"); },
   reviewStale()             { return this.request("/review/stale-projects"); },
   reviewDeadlines(d)        { return this.request("/review/upcoming-deadlines?days=" + (d || 7)); },
@@ -633,6 +640,7 @@ api.deleteProject = function(id) { return this.mutate("DELETE", "/projects/" + i
 api.createTag = function(body) { return this.mutate("POST", "/tags", body); };
 api.updateTag = function(id, body) { return this.mutate("PATCH", "/tags/" + id, body); };
 api.deleteTag = function(id) { return this.mutate("DELETE", "/tags/" + id, null); };
+api.updateDonorStatus = function(id, body) { return this.mutate("PATCH", "/donor-tasks/" + id + "/status", body); };
 
 // ── DOM refs ───────────────────────────────────────────────────
 var $modal   = document.getElementById("api-key-modal");
@@ -1002,8 +1010,8 @@ function itemCard(item, statusSlug) {
 
   var actions = "";
   if (statusSlug) {
-    var t = esc(item.title);
-    var sa = 'data-id="' + parseInt(item.id) + '" data-status="' + esc(statusSlug) + '"';
+    var t = escAttr(item.title);
+    var sa = 'data-id="' + parseInt(item.id) + '" data-status="' + escAttr(statusSlug) + '"';
     actions = '<div class="card-actions">' +
       '<button class="btn-action btn-complete" data-action="complete" ' + sa + ' data-title="' + t + '">Done</button>' +
       '<button class="btn-action btn-edit" data-action="edit" ' + sa + '>Edit</button>' +
@@ -1024,10 +1032,11 @@ function projectCard(p) {
   var done = p.completed_action_count || 0;
   var total = p.action_count || 0;
   var hasStats = typeof p.action_count !== "undefined";
-  var t = esc(p.title);
+  var tHtml = esc(p.title);
+  var tAttr = escAttr(p.title);
   return '<div class="card">' +
     '<a href="#projects/' + parseInt(p.id) + '">' +
-    '<div class="card-title">' + t + "</div>" +
+    '<div class="card-title">' + tHtml + "</div>" +
     (p.description ? '<div class="card-notes">' + esc(p.description) + "</div>" : "") +
     '<div class="card-meta">' +
       '<span class="badge ' + statusCls + '">' + esc(p.status.replace("_", " ")) + "</span>" +
@@ -1039,7 +1048,7 @@ function projectCard(p) {
     "</a>" +
     '<div class="card-actions">' +
       '<button class="btn-action btn-edit" data-action="edit-project" data-id="' + parseInt(p.id) + '">Edit</button>' +
-      '<button class="btn-action btn-delete" data-action="delete-project" data-id="' + parseInt(p.id) + '" data-title="' + t + '">Delete</button>' +
+      '<button class="btn-action btn-delete" data-action="delete-project" data-id="' + parseInt(p.id) + '" data-title="' + tAttr + '">Delete</button>' +
     "</div></div>";
 }
 
@@ -1053,7 +1062,38 @@ function areaCard(a) {
     "</div></a>";
 }
 
+function donorTaskCard(t) {
+  var meta = [];
+  if (t.task_date) meta.push('<span class="badge badge-gray">' + esc(t.task_date.slice(0, 10)) + '</span>');
+  if (t.is_thank) meta.push('<span class="badge badge-green">Thank</span>');
+  var tid = parseInt(t.donor_task_id);
+  var tAttr = escAttr(t.title);
+  var actions = t.status === "next_action"
+    ? '<div class="card-actions">' +
+        '<button class="btn-action btn-complete" data-action="donor-complete" data-id="' + tid + '" data-title="' + tAttr + '">Done</button>' +
+        '<button class="btn-action btn-delete" data-action="donor-cancel" data-id="' + tid + '" data-title="' + tAttr + '">Cancel</button>' +
+      '</div>'
+    : '';
+  return '<div class="card">' +
+    '<div class="card-title">' + esc(t.title) + '</div>' +
+    (t.notes ? '<div class="card-notes">' + esc(t.notes) + '</div>' : '') +
+    (meta.length ? '<div class="card-meta">' + meta.join(' ') + '</div>' : '') +
+    actions + '</div>';
+}
+
 // ── Views ──────────────────────────────────────────────────────
+async function viewDonorTasks() {
+  // All dynamic values are escaped via esc() in donorTaskCard before DOM insertion
+  $view.innerHTML = loader();
+  try {
+    var items = cache.donorTasks || (cache.donorTasks = await api.getDonorTasks());
+    var pending = items.filter(function(i) { return i.status === "next_action"; });
+    var h = '<div class="view-header"><h2>Donor Tasks</h2><span class="count-badge">' + pending.length + '</span></div>';
+    if (!pending.length) { $view.innerHTML = h + emptyMsg("&#x1f91d;", "No pending donor tasks"); return; }
+    $view.innerHTML = h + pending.map(donorTaskCard).join('');
+  } catch (e) { showErr(e); }
+}
+
 async function viewInbox() {
   $view.innerHTML = loader();
   try {
@@ -1408,6 +1448,12 @@ $view.addEventListener("click", function(e) {
     case "delete-tag":     handleDeleteTag(id, title); break;
     case "new-tag":        handleNewTag(); break;
     case "new-item":       handleNewItem(status); break;
+    case "donor-complete": showConfirm('Mark "' + title + '" as done?', async function() {
+      await api.updateDonorStatus(id, { status: "completed" });
+    }, "Done", "var(--green)"); break;
+    case "donor-cancel": showConfirm('Cancel donor task "' + title + '"?', async function() {
+      await api.updateDonorStatus(id, { status: "deleted" });
+    }); break;
   }
 });
 
@@ -1433,6 +1479,7 @@ function route() {
   switch (view) {
     case "inbox":        viewInbox(); break;
     case "next-actions": viewNextActions(); break;
+    case "donor-tasks":  viewDonorTasks(); break;
     case "projects":     param ? viewProjectDetail(param) : viewProjects(); break;
     case "someday":      viewSomeday(); break;
     case "tickler":      viewTickler(); break;
