@@ -5,7 +5,7 @@
 - Deployed on Fly.io (region: ord, app: gtd-api)
 
 ## Commands
-- `uv run pytest` or `python -m pytest` — run tests (235 tests)
+- `uv run pytest` or `python -m pytest` — run tests (242 tests)
 - `uvicorn app.main:app --reload` — local dev server (port 8000)
 
 ## Testing
@@ -24,7 +24,7 @@
 - Deploy donor DB (sr-assistant) BEFORE this app — GTD depends on it at runtime
 - Fly.io .internal DNS does NOT resolve across regions — use public URL (https://donor-management.fly.dev)
 - `DONOR_DB_URL` and `DONOR_DB_API_KEY` set via `fly secrets set`
-- Dashboard at /dashboard does not yet show donor tasks
+- Dashboard at /dashboard shows donor tasks (Donor Tasks tab after Next Actions)
 
 ## Git
 - Merge with `--no-ff`
